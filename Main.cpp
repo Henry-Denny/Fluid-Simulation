@@ -15,6 +15,8 @@ extern "C"
 sf::Color hsv(int hue, float sat, float val);
 void Render(sf::RenderWindow *window, FluidSquare *fluid);
 void DrawDensity(sf::RenderWindow *window, FluidSquare *fluid);
+void ProcessInput(sf::RenderWindow *window, FluidSquare *fluid, bool &simulating, bool &paused);
+void AddDensitySources(FluidSquare *fluid);
 
 int main()
 {
@@ -23,74 +25,15 @@ int main()
     
     FluidSquare *fluid = FluidSquareCreate(DIM, 0, 0, 0.2);
 
-    sf::Vector2i prevMousePos = sf::Mouse::getPosition(window);
     bool simulating = true;
     bool paused = false;
     while (simulating)
     {
-        sf::Event ev;
-        while(window.pollEvent(ev))
-        {
-            if (ev.type == sf::Event::Closed)
-            {
-                simulating = false;
-            }
-            if (ev.type == sf::Event::KeyPressed)
-            {
-                switch (ev.key.code)
-                {
-                    case (sf::Keyboard::C):
-                        // ResetFields(&fluid);
-                        break;
-                    case (sf::Keyboard::Space):
-                        paused = !paused;
-                        break;
-                    default:
-                        break;
-                }
-            }
-        }
-
-        sf::Vector2i mousePos = sf::Mouse::getPosition(window);
-        sf::Vector2i gridPos {mousePos.x / CELL_SIZE, mousePos.y / CELL_SIZE};
-
-        
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
-        {
-            
-            for (int i = -3; i < 3; ++i)
-            {
-                for (int j = -3; j < 3; ++j)
-                {
-                    if (gridPos.x + i < 0 || gridPos.y + j < 0 || gridPos.x + i >= fluid->size || gridPos.y + j >= fluid->size) continue;
-                    FluidSquareAddDensity(fluid, gridPos.x + i, gridPos.y + j, 50.0f);
-                    FluidSquareAddVelocity(fluid, gridPos.x + i, gridPos.y + j, ((float)rand() / RAND_MAX - 0.5f), ((float)rand() / RAND_MAX - 0.5f));
-                }
-            }
-        }
-        if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
-        {
-            for (int i = -3; i < 3; ++i)
-            {
-                for (int j = -3; j < 3; ++j)
-                {
-                    sf::Vector2f force = sf::Vector2f(mousePos - prevMousePos);
-                    if (force.x != 0.0f || force.y != 0.0f) force = force / std::sqrt(force.x * force.x + force.y * force.y);
-                    if (gridPos.x + i < 0 || gridPos.y + j < 0 || gridPos.x + i >= fluid->size || gridPos.y + j >= fluid->size) continue;
-                    FluidSquareAddVelocity(fluid, gridPos.x + i, gridPos.y + j, force.x, force.y);
-                }
-            }
-        }
-        prevMousePos = mousePos;
+        ProcessInput(&window, fluid, simulating, paused);
 
         if (!paused)
         {
-            FluidSquareAddDensity(fluid, 80, 128, 500.0f);
-            FluidSquareAddVelocity(fluid, 80, 128, 0.1f, 0.0f);
-
-            FluidSquareAddDensity(fluid, 176, 128, 500.0f);
-            FluidSquareAddVelocity(fluid, 176, 128, -0.1f, 0.0f);
-
+            AddDensitySources(fluid);
             FluidSquareStep(fluid);
         }
 
@@ -99,6 +42,77 @@ int main()
 
     FluidSquareFree(fluid);
     return 0;
+}
+
+void ProcessInput(sf::RenderWindow *window, FluidSquare *fluid, bool &simulating, bool &paused)
+{
+    static sf::Vector2i prevMousePos = sf::Mouse::getPosition(*window);
+    
+    // Keyboard and close window
+    sf::Event ev;
+    while(window->pollEvent(ev))
+    {
+        if (ev.type == sf::Event::Closed)
+        {
+            simulating = false;
+        }
+        if (ev.type == sf::Event::KeyPressed)
+        {
+            switch (ev.key.code)
+            {
+                case (sf::Keyboard::C):
+                    // ResetFields(&fluid);
+                    break;
+                case (sf::Keyboard::Space):
+                    paused = !paused;
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+
+    // Mouse
+    sf::Vector2i mousePos = sf::Mouse::getPosition(*window);
+    sf::Vector2i gridPos {mousePos.x / CELL_SIZE, mousePos.y / CELL_SIZE};
+
+    if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left))
+    {
+        
+        for (int i = -3; i < 3; ++i)
+        {
+            for (int j = -3; j < 3; ++j)
+            {
+                if (gridPos.x + i < 0 || gridPos.y + j < 0 || gridPos.x + i >= fluid->size || gridPos.y + j >= fluid->size) continue;
+                FluidSquareAddDensity(fluid, gridPos.x + i, gridPos.y + j, 50.0f);
+                FluidSquareAddVelocity(fluid, gridPos.x + i, gridPos.y + j, ((float)rand() / RAND_MAX - 0.5f), ((float)rand() / RAND_MAX - 0.5f));
+            }
+        }
+    }
+    if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Right))
+    {
+        for (int i = -3; i < 3; ++i)
+        {
+            for (int j = -3; j < 3; ++j)
+            {
+                sf::Vector2f force = sf::Vector2f(mousePos - prevMousePos);
+                if (force.x != 0.0f || force.y != 0.0f) force = force / std::sqrt(force.x * force.x + force.y * force.y);
+                if (gridPos.x + i < 0 || gridPos.y + j < 0 || gridPos.x + i >= fluid->size || gridPos.y + j >= fluid->size) continue;
+                FluidSquareAddVelocity(fluid, gridPos.x + i, gridPos.y + j, force.x, force.y);
+            }
+        }
+    }
+    prevMousePos = mousePos;
+}
+
+void AddDensitySources(FluidSquare *fluid)
+{
+    FluidSquareAddDensity(fluid, 80, 128, 500.0f);
+    FluidSquareAddVelocity(fluid, 80, 128, 0.1f, 0.0f);
+
+    FluidSquareAddDensity(fluid, 176, 128, 500.0f);
+    FluidSquareAddVelocity(fluid, 176, 128, -0.1f, 0.0f);
 }
 
 void Render(sf::RenderWindow *window, FluidSquare *fluid)
